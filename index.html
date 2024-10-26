@@ -23,18 +23,21 @@
             border: 2px solid #333;
             background-color: #fff;
         }
-        #score {
+        .game-stats {
             position: absolute;
             top: 0;
-            right: -100px;
-            width: 80px;
-            padding: 10px;
+            right: -150px;
+            width: 130px;
+        }
+        .stat-box {
             background-color: #333;
             color: white;
             text-align: center;
             border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
         }
-        .game-over {
+        .overlay {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -82,6 +85,21 @@
             user-select: none;
             font-size: 24px;
         }
+        #pause-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            background-color: #333;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
         @media (max-width: 600px) {
             #game-board {
                 width: 300px;
@@ -90,10 +108,17 @@
             #controls {
                 display: block;
             }
-            #score {
+            .game-stats {
                 position: relative;
                 right: 0;
-                margin: 10px auto;
+                display: flex;
+                width: 100%;
+                justify-content: space-around;
+                margin-bottom: 10px;
+            }
+            .stat-box {
+                flex: 1;
+                margin: 0 5px;
             }
             .desktop-controls {
                 display: none;
@@ -104,15 +129,25 @@
 <body>
     <h1>Tetris</h1>
     <div id="game-container">
+        <div id="pause-btn">⏸️</div>
         <canvas id="game-board" width="300" height="600"></canvas>
-        <div id="score">Score: <span id="score-value">0</span></div>
-        <div class="game-over" id="game-over">
+        <div class="game-stats">
+            <div class="stat-box">Score: <span id="score-value">0</span></div>
+            <div class="stat-box">High Score: <span id="high-score-value">0</span></div>
+        </div>
+        <div class="overlay" id="game-over">
             Game Over!
             <br>
             <button onclick="resetGame()">Play Again</button>
         </div>
+        <div class="overlay" id="pause-menu">
+            Game Paused
+            <br>
+            <button onclick="togglePause()">Resume</button>
+            <button onclick="resetGame()">New Game</button>
+        </div>
     </div>
-    <p class="desktop-controls">Use ←↑→↓ keys to play</p>
+    <p class="desktop-controls">Use ←↑→↓ keys to play, Space to pause</p>
     
     <div id="controls">
         <div class="control-row">
@@ -132,9 +167,14 @@
         const BOARD_WIDTH = 10;
         const BOARD_HEIGHT = 20;
         let score = 0;
+        let highScore = parseInt(localStorage.getItem('tetrisHighScore')) || 0;
         let gameOver = false;
+        let isPaused = false;
         let board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
         let currentPiece = null;
+        let gameInterval = null;
+
+        document.getElementById('high-score-value').textContent = highScore;
 
         const SHAPES = [
             [[1, 1, 1, 1]], // I
@@ -232,9 +272,17 @@
                     }
                 }
             }
+
+            // Draw pause overlay
+            if (isPaused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
         }
 
         function moveDown() {
+            if (gameOver || isPaused) return;
+            
             currentPiece.y++;
             if (currentPiece.collision()) {
                 currentPiece.y--;
@@ -242,8 +290,7 @@
                 checkLines();
                 currentPiece = new Piece();
                 if (currentPiece.collision()) {
-                    gameOver = true;
-                    document.getElementById('game-over').style.display = 'block';
+                    endGame();
                 }
             }
         }
@@ -274,6 +321,23 @@
             if (linesCleared > 0) {
                 score += linesCleared * 100;
                 document.getElementById('score-value').textContent = score;
+                checkHighScore();
+            }
+        }
+
+        function checkHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('tetrisHighScore', highScore);
+                document.getElementById('high-score-value').textContent = highScore;
+            }
+        }
+
+        function endGame() {
+            gameOver = true;
+            document.getElementById('game-over').style.display = 'block';
+            if (gameInterval) {
+                clearInterval(gameInterval);
             }
         }
 
@@ -282,9 +346,31 @@
             score = 0;
             document.getElementById('score-value').textContent = score;
             gameOver = false;
+            isPaused = false;
             document.getElementById('game-over').style.display = 'none';
+            document.getElementById('pause-menu').style.display = 'none';
             currentPiece = new Piece();
+            
+            if (gameInterval) {
+                clearInterval(gameInterval);
+            }
+            gameInterval = setInterval(() => {
+                if (!isPaused && !gameOver) {
+                    moveDown();
+                    draw();
+                }
+            }, 1000);
+            
             draw();
+        }
+
+        function togglePause() {
+            if (!gameOver) {
+                isPaused = !isPaused;
+                document.getElementById('pause-menu').style.display = isPaused ? 'block' : 'none';
+                document.getElementById('pause-btn').textContent = isPaused ? '▶️' : '⏸️';
+                draw();
+            }
         }
 
         // Touch controls
@@ -296,7 +382,7 @@
         };
 
         function handleTouch(action) {
-            if (gameOver) return;
+            if (gameOver || isPaused) return;
 
             switch (action) {
                 case 'left':
@@ -328,7 +414,6 @@
                 handleTouch(action);
             });
             
-            // For continuous movement while holding
             if (action === 'down') {
                 let intervalId = null;
                 
@@ -344,6 +429,13 @@
                     }
                 });
             }
+        });
+
+        // Add pause button event
+        document.getElementById('pause-btn').addEventListener('click', togglePause);
+        document.getElementById('pause-btn').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            togglePause();
         });
 
         // Keyboard controls
@@ -363,13 +455,21 @@
                 case 38: // Up (rotate)
                     handleTouch('rotate');
                     break;
+                case 32: // Space bar (pause)
+                    togglePause();
+                    break;
             }
         });
 
-        // Game loop
+        // Prevent scrolling when touching the game controls
+        document.getElementById('controls').addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+
+        // Initialize game
         currentPiece = new Piece();
-        setInterval(() => {
-            if (!gameOver) {
+        gameInterval = setInterval(() => {
+            if (!isPaused && !gameOver) {
                 moveDown();
                 draw();
             }
@@ -377,11 +477,7 @@
 
         // Initial draw
         draw();
-
-        // Prevent scrolling when touching the game controls
-        document.getElementById('controls').addEventListener('touchmove', (e) => {
-            e.preventDefault();
-        }, { passive: false });
     </script>
 </body>
 </html>
+                    
