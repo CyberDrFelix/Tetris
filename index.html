@@ -461,56 +461,6 @@
             }
         });
 
-           // Increase game speed every 5000 points
-        const SPEED_UP_SCORE = 5000;
-        let gameSpeed = 1000; // Initial speed in milliseconds
-
-        function moveDown() {
-            if (gameOver || isPaused) return;
-            
-            currentPiece.y++;
-            if (currentPiece.collision()) {
-                currentPiece.y--;
-                mergePiece();
-                checkLines();
-                currentPiece = new Piece();
-                if (currentPiece.collision()) {
-                    endGame();
-                }
-            }
-            
-            // Increase game speed
-            if (score >= SPEED_UP_SCORE) {
-                const speedUpAmount = 100; // Decrease speed by 100ms
-                gameSpeed = Math.max(gameSpeed - speedUpAmount, 100); // Don't go below 100ms
-                clearInterval(gameInterval);
-                gameInterval = setInterval(() => {
-                    if (!isPaused && !gameOver) {
-                        moveDown();
-                        draw();
-                    }
-                }, gameSpeed);
-            }
-        }
-
-        // Add touch event support for mobile devices
-        window.addEventListener('touchstart', (event) => {
-            event.preventDefault();
-            const touches = event.changedTouches;
-            for (let i = 0; i < touches.length; i++) {
-                const touch = touches[i];
-                const x = touch.clientX;
-                const y = touch.clientY;
-                // Implement touch event handling logic here
-            }
-        }, { passive: false });
-
-        // Add background music
-        const audioElement = document.createElement('audio');
-        audioElement.src = 'https://www.rcast.net/dir/68949/radio-zu-live'; // Replace with your music source
-        audioElement.loop = true;
-        audioElement.play();
-
         // Prevent scrolling when touching the game controls
         document.getElementById('controls').addEventListener('touchmove', (e) => {
             e.preventDefault();
@@ -530,4 +480,3 @@
     </script>
 </body>
 </html>
-                    
